@@ -26,48 +26,6 @@ import random
 from collections import OrderedDict
 from scipy.stats import pearsonr
 
-import donkey
-
-random.seed(2)
-torch.manual_seed(2)
-np.random.seed(2)
-
-DATASET = 'data.txt'
-print(DATASET)
-
-T = 3
-BATCH_SIZE = 4
-MAXITER = 40000
-LIMIT = 0
-LR = 5e-4
-
-R = nn.Linear(150, 128)
-U = {0: nn.Linear(156, 75), 1: nn.Linear(156, 75), 2: nn.Linear(156, 75)}
-V = {0: nn.Linear(75, 75), 1: nn.Linear(75, 75), 2: nn.Linear(75, 75)}
-E = nn.Linear(6, 6)
-
-
-def adjust_learning_rate(optimizer, epoch):
-    """Sets the learning rate to the initial LR decayed by .8 every 5 epochs"""
-    lr = LR * (0.9 ** (epoch // 10))
-    print('new lr [%.5f]' % lr)
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-
-def load_dataset():
-    train_features, train_labels, val_features, val_labels = donkey.load_dataset(DATASET)
-    #print(train_features, train_labels, val_features, val_labels)
-
-    scaler = preprocessing.StandardScaler().fit(train_labels)
-    train_labels = scaler.transform(train_labels)
-    val_labels = scaler.transform(val_labels)
-
-    train_labels = Variable(torch.FloatTensor(train_labels), requires_grad=False)
-    val_labels = Variable(torch.FloatTensor(val_labels), requires_grad=False)
-
-    return train_features, train_labels, val_features, val_labels
-
 
 def readout(h, h2):
     catted_reads = map(lambda x: torch.cat([h[x[0]], h2[x[1]]], 1), zip(h2.keys(), h.keys()))
@@ -84,7 +42,6 @@ def message_pass(g, h, k):
         for neighbor in neighbors:
             e_vw = neighbor[0]  # feature variable
             w = neighbor[1]
-
             m_w = V[k](h[w])
             m_e_vw = E(e_vw)
             reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
@@ -92,6 +49,7 @@ def message_pass(g, h, k):
 
 
 def construct_multigraph(smile):
+    print(smile)
     g = OrderedDict({})
     h = OrderedDict({})
 
