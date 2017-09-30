@@ -1,6 +1,6 @@
 # 2017 DeepCrystal Technologies - Patrick Hop
 #
-# Data loading a splitting file
+# Data loading data.test splitting file
 #
 # MIT License - have fun!!
 # ===========================================================
