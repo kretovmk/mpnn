@@ -1,9 +1,3 @@
-# 2017 DeepCrystal Technologies - Patrick Hop
-#
-# Message Passing Neural Network SELU [MPNN-S] for Chemical Multigraphs
-#
-# MIT License - have fun!!
-# ===========================================================
 
 import math
 
@@ -27,48 +21,53 @@ from collections import OrderedDict
 from scipy.stats import pearsonr
 
 
-def readout(h, h2):
-    catted_reads = map(lambda x: torch.cat([h[x[0]], h2[x[1]]], 1), zip(h2.keys(), h.keys()))
-    activated_reads = map(lambda x: F.selu(R(x)), catted_reads)
-    readout = Variable(torch.zeros(1, 128))
-    for read in activated_reads:
-        readout = readout + read
-    return F.tanh(readout)
+class MPNN:
+    """
+    Performs full message passing procedure.
+    """
+
+    def __init__(self):
+        self.params = None
+
+    def add_params(self, params):
+        self.params.append(params)
+
+    def get_features_from_smiles(self, smile):
+        g = OrderedDict({})
+        h = OrderedDict({})
+        molecule = Chem.MolFromSmiles(smile)
+        for i in range(0, molecule.GetNumAtoms()):
+            atom_i = molecule.GetAtomWithIdx(i)
+            h[i] = Variable(torch.FloatTensor(dc.feat.graph_features.atom_features(atom_i)\
+                                              .astype(np.float32))).view(1, 75)  # mk: added astype
+            for j in range(0, molecule.GetNumAtoms()):
+                e_ij = molecule.GetBondBetweenAtoms(i, j)
+                if e_ij != None:
+                    e_ij = list(map(lambda x: 1 if x == True else 0,  # mk: added list
+                                    dc.feat.graph_features.bond_features(e_ij)))  # ADDED edge feat
+                    e_ij = Variable(torch.FloatTensor(e_ij).view(1, 6))
+                    atom_j = molecule.GetAtomWithIdx(j)
+                    if i not in g:
+                        g[i] = []
+                        g[i].append((e_ij, j))
+        return g, h
 
 
-def message_pass(g, h, k):
-    for v in g.keys():
-        neighbors = g[v]
-        for neighbor in neighbors:
-            e_vw = neighbor[0]  # feature variable
-            w = neighbor[1]
-            m_w = V[k](h[w])
-            m_e_vw = E(e_vw)
-            reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
-            h[v] = F.selu(U[k](reshaped))
+    def message_pass(self, g, h, k):
+        for v in g.keys():
+            neighbors = g[v]
+            for neighbor in neighbors:
+                e_vw = neighbor[0]  # feature variable
+                w = neighbor[1]
+                m_w = V[k](h[w])
+                m_e_vw = E(e_vw)
+                reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
+                h[v] = F.selu(U[k](reshaped))
 
 
-def construct_multigraph(smile):
-    print(smile)
-    g = OrderedDict({})
-    h = OrderedDict({})
 
-    molecule = Chem.MolFromSmiles(smile)
-    for i in range(0, molecule.GetNumAtoms()):
-        atom_i = molecule.GetAtomWithIdx(i)
-        h[i] = Variable(torch.FloatTensor(dc.feat.graph_features.atom_features(atom_i).astype(np.float32))).view(1, 75)  # mk: added astype
-        for j in range(0, molecule.GetNumAtoms()):
-            e_ij = molecule.GetBondBetweenAtoms(i, j)
-            if e_ij != None:
-                e_ij = list(map(lambda x: 1 if x == True else 0,    # mk: added list
-                           dc.feat.graph_features.bond_features(e_ij)))  # ADDED edge feat
-                e_ij = Variable(torch.FloatTensor(e_ij).view(1, 6))
-                atom_j = molecule.GetAtomWithIdx(j)
-                if i not in g:
-                    g[i] = []
-                    g[i].append((e_ij, j))
 
-    return g, h
+
 
 
 train_smiles, train_labels, val_smiles, val_labels = load_dataset()
