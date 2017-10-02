@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class FuncR(nn.Module):
+class RfuncMLP(nn.Module):
     """
     Readout function (R in ref.article).
     Takes as input hidden states of atom in the form (N_atoms, N_features).
     Perform summarization over atoms' axis and then make non-linear transformation.
     """
     def __init__(self, inp_size, hid):
-        super(FuncR, self).__init__()
+        super(RfuncMLP, self).__init__()
         self.inp_size = inp_size
         self.hid = hid
         if self.hid:
