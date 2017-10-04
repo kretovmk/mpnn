@@ -21,6 +21,7 @@ class RfuncMLP(nn.Module):
 
 
     def forward(self, x):
+        #print(x)
         if self.hid:
             out = F.relu(self.linear(x))
             return F.sigmoid(self.out(out))

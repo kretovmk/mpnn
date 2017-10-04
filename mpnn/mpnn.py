@@ -18,10 +18,10 @@ class MPNN:
     """
     Performs full message passing procedure.
     """
-    def __init__(self, M_start, M_hid, U, R, t):
+    def __init__(self, M_start, M_hid, U_start, U_hid, R, t):
         assert t > 0, 'ERROR: incorrect T value.'
         self.params = []
-        self._construct_message_passing_func(M_start, M_hid, U, R, t)
+        self._construct_message_passing_func(M_start, M_hid, U_start, U_hid, R, t)
         self._add_params()
         self.opt = optim.Adam(self.params, lr=1e-3)
 
@@ -35,20 +35,21 @@ class MPNN:
             g, h = self.get_features_from_smiles(smile)
             for k in range(0, t):
                 self.single_message_pass(g, h, k)
-            y_pred = self.R(h)
+            h_concat = Variable(torch.cat([vv.data for kk, vv in h.items()], dim=0))
+            y_pred = self.R(h_concat.sum(dim=0, keepdim=True))       # TODO: replace sum -- just for debug
             loss += (y_pred - y_true) **2 / Variable(torch.FloatTensor([len(x)])).view(1, 1)
-        print(loss)
+        print(loss.data[0][0])
         loss.backward()
         self.opt.step()
 
-    def _construct_message_passing_func(self, M_start, M_hid, U, R, t):
+    def _construct_message_passing_func(self, M_start, M_hid, U_start, U_hid, R, t):
         self.R = R
         self.U, self.M = {}, {}
         self.M[0] = M_start
-        self.U[0] = copy.deepcopy(U)
+        self.U[0] = U_start
         for i in range(1, t):
             self.M[i] = copy.deepcopy(M_hid)
-            self.U[i] = copy.deepcopy(U)
+            self.U[i] = copy.deepcopy(U_hid)
 
     def _add_params(self):
         self.params += list(self.R.parameters())
