@@ -37,10 +37,11 @@ class MPNN:
                 self.single_message_pass(g, h, k)
             h_concat = Variable(torch.cat([vv.data for kk, vv in h.items()], dim=0))
             y_pred = self.R(h_concat.sum(dim=0, keepdim=True))       # TODO: replace sum -- just for debug
-            loss += (y_pred - y_true) **2 / Variable(torch.FloatTensor([len(x)])).view(1, 1)
+            loss += (y_pred - y_true) ** 2 / Variable(torch.FloatTensor([len(x)])).view(1, 1)
         print(loss.data[0][0])
         loss.backward()
         self.opt.step()
+        return loss.data[0][0]
 
     def _construct_message_passing_func(self, M_start, M_hid, U_start, U_hid, R, t):
         self.R = R
