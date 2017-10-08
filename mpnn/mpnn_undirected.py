@@ -14,7 +14,9 @@ from collections import OrderedDict
 # Some parts of code taken from https://github.com/deepchem/deepchem/blob/master/contrib/mpnn/mpnn.py
 # MIT License
 
-class MPNN:
+class MPNNundirected:
+
+    #TODO: just draft! need to be rewrited
     """
     Performs full message passing procedure.
     """
@@ -23,23 +25,31 @@ class MPNN:
         self.params = []
         self._construct_message_passing_func(M_start, M_hid, U_start, U_hid, R, t)
         self._add_params()
-        self.opt = optim.Adam(self.params, lr=1e-3)
+        self.opt = optim.Adam(self.params, lr=1e-2)
 
-    def make_opt_step(self, batch, t):
-        x, y = batch
+
+    def forward_pass(self, x, t):
+        g, h = self.get_features_from_smiles(x)
+        for k in range(0, t):
+            self.single_message_pass(g, h, k)
+        h_concat = Variable(torch.cat([vv.data for kk, vv in h.items()], dim=0))
+        y_pred = self.R(h_concat.sum(dim=0, keepdim=True))
+        return y_pred
+
+
+    def make_opt_step(self, batch_x, batch_y, t):
         self.opt.zero_grad()
         loss = Variable(torch.zeros(1, 1))
-        for i in range(len(x)):
-            smile = x[i]
-            y_true = y[i]
+        for i in range(len(batch_x)):
+            smile = batch_x[i]
+            y_true = batch_y[i]
             g, h = self.get_features_from_smiles(smile)
             for k in range(0, t):
                 self.single_message_pass(g, h, k)
             h_concat = Variable(torch.cat([vv.data for kk, vv in h.items()], dim=0))
-            y_pred = self.R(h_concat.sum(dim=0, keepdim=True))       # TODO: replace sum -- just for debug
-            loss += (y_pred - y_true) ** 2 / Variable(torch.FloatTensor([len(x)])).view(1, 1)
+            y_pred = self.R(h_concat.sum(dim=0, keepdim=True))       # TODO: replace sum -- too simple (just for debug)
+            loss += (y_pred - y_true) ** 2 / Variable(torch.FloatTensor([len(batch_x)])).view(1, 1)
         loss.backward()
-
         self.opt.step()
         return loss.data[0][0]
 
@@ -77,7 +87,25 @@ class MPNN:
                         g[i].append((e_ij, j))
         return g, h
 
+
     def single_message_pass(self, g, h, k):
+        h_before = {}
+        for key, value in h.items():
+            h_before[key] = copy.deepcopy(value.data)
+        for v in g.keys():
+            neighbors = g[v]
+            m_v_k = None
+            for neighbor in neighbors:
+                e_vw = neighbor[0]  # bond feature (between v and w)
+                w = neighbor[1]  # atom w feature
+                if m_v_k is None:
+                    m_v_k = self.M[k](torch.cat((h_before[v], h_before[w], e_vw), dim=1))
+                else:
+                    m_v_k += self.M[k](torch.cat((h_before[v], h_before[w], e_vw), dim=1))
+            h[v] = self.U[k](torch.cat((h_before[v], m_v_k), dim=1))
+
+
+    def old_single_message_pass(self, g, h, k):
         h_before = {}
         for key, value in h.items():
             h_before[key] = Variable(copy.deepcopy(value.data))
