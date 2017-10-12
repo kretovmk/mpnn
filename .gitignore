@@ -14,5 +14,5 @@ logs/
 *temp*
 Untitled*.ipynb
 *_test.py
-*.data
+*data
 other/
