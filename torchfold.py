@@ -44,8 +44,7 @@ class Fold(object):
                 self.step, self.index, self.op)
 
     def __init__(self, volatile=False, cuda=False):
-        self.steps = collections.defaultdict(
-            lambda: collections.defaultdict(list))
+        self.steps = collections.defaultdict(lambda: collections.defaultdict(list))
         self.cached_nodes = collections.defaultdict(dict)
         self.total_nodes = 0
         self.volatile = volatile
