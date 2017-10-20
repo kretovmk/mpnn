@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
 
-# taken from: https://github.com/nearai/pytorch-tools
+# code for torchfold taken from: https://github.com/nearai/pytorch-tools
 
 class Fold(object):
 
@@ -106,6 +106,8 @@ class Fold(object):
             for op in self.steps[step]:
                 func = getattr(nn, op)
                 try:
+                    print(*self.steps[step][op])
+                    print('step: {}'.format(step))
                     batched_args = self._batch_args(
                         zip(*self.steps[step][op]), values)
                 except Exception:
@@ -124,6 +126,9 @@ class Fold(object):
                 else:
                     values[step][op] = torch.chunk(res, arg_size)
         try:
+            print('...')
+            print(nodes)
+            print(values)
             return self._batch_args(nodes, values)
         except Exception:
             print("Retrieving %s" % nodes)
