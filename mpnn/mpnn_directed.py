@@ -43,7 +43,7 @@ class MPNNdirected:
             g, h = self.get_features_from_smiles(smile)
             g2, h2 = self.get_features_from_smiles(smile)
             for k in range(0, t):
-                self.single_message_pass_dyn_batched(g, h, k)
+                self.single_message_pass(g, h, k)
             y_pred = self.R(h, h2)
             loss += (y_pred - y_true) * (y_pred - y_true) / Variable(torch.FloatTensor([len(batch_x)])).view(1, 1)
         loss.backward()
@@ -93,32 +93,63 @@ class MPNNdirected:
                 reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
                 h[v] = F.tanh(getattr(self, 'U_{}'.format(k))(reshaped))
 
-    def mcat(self, x1, x2, x3):
+    def fold_cat(self, x1, x2, x3):
         return torch.cat((x1, x2, x3), 1)
 
-    def mtanh(self, x):
+    def fold_non_lin(self, x):
         return F.tanh(x)
 
-    def single_message_pass_dyn_batched(self, g, h, k):
-        fold = Fold()
+    def single_message_pass_dyn_batched(self, g, h, k, fold):
         for v in g.keys():  # iterate over atoms
             neighbors = g[v]   # list of tuples of the form (e_vw, w)
             for neighbor in neighbors:
                 e_vw = neighbor[0]  # bond feature (between v and w)
                 w = neighbor[1]  # atom w number
-                #m_w = getattr(self, 'V_{}'.format(k))(h[w])   # h[w] is feature of atom w
                 m_w = fold.add('V_{}'.format(k), h[w])
-                #m_e_vw = self.E(e_vw)
                 m_e_vw = fold.add('E', e_vw)
-                #reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
-                reshaped = fold.add('mcat', h[v], m_w, m_e_vw)
-                #h[v] = F.tanh(getattr(self, 'U_{}'.format(k))(reshaped))
-                tmp = fold.add('U_{}'.format(k), reshaped)
-                h[v] = fold.add('mtanh', tmp)
+                reshaped = fold.add('fold_cat', h[v], m_w, m_e_vw)
+                res = fold.add('U_{}'.format(k), reshaped)
+                h[v] = fold.add('fold_non_lin', res)
+        return fold
+        # return fold, [list(h.values())]
+        # result = fold.apply(self, [list(h.values())])[0].split(1, dim=0)
+        # for i, r in enumerate(result):
+        #     h[i] = r
 
-        result = fold.apply(self, [list(h.values())])[0].split(1, dim=0)
-        for i, r in enumerate(result):
-            h[i] = r
+
+    def make_opt_step_batched(self, batch_x, batch_y, t):
+        self.opt.zero_grad()
+        loss = Variable(torch.zeros(1, 1))
+        fold = Fold()
+        g_dict, h_dict, h2_dict, y_true_dict = OrderedDict(), OrderedDict(), OrderedDict(), OrderedDict()
+        for i in range(len(batch_x)):
+            smile = batch_x[i]
+            y_true_dict[smile] = batch_y[i]
+
+            g_dict[smile], h_dict[smile] = self.get_features_from_smiles(smile)
+            _, h2_dict[smile] = self.get_features_from_smiles(smile)
+
+            for k in range(0, t):
+                fold = self.single_message_pass_dyn_batched(g_dict[smile], h_dict[smile], k, fold)
+
+        # folded_nodes = h
+        # result = fold.apply()
+        self.fold = fold
+        folded_nodes = []
+        for k, v in h_dict.items():
+            folded_nodes.append(list(v.values()))
+
+        print(folded_nodes)
+        result = fold.apply(self, folded_nodes)
+        print('1111')
+
+
+
+        #     y_pred = self.R(h_dict[smile], h2_dict[smile])
+        #     loss += (y_pred - y_true) * (y_pred - y_true) / Variable(torch.FloatTensor([len(batch_x)])).view(1, 1)
+        # loss.backward()
+        # self.opt.step()
+        # return loss.data[0][0]
 
 
 
