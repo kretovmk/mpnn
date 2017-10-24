@@ -105,9 +105,14 @@ class Fold(object):
             values[step] = {}
             for op in self.steps[step]:
                 func = getattr(nn, op)
+                #print(op)
                 try:
-                    #print(*self.steps[step][op])
-                    #print('step: {}'.format(step))
+
+                    if op == 'fold_cat':
+                        print('***')
+                        print(op)
+                        print(*self.steps[step][op])
+                        print('step: {}'.format(step))
                     batched_args = self._batch_args(
                         zip(*self.steps[step][op]), values)
                 except Exception:

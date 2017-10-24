@@ -110,7 +110,6 @@ class MPNNdirected:
                 reshaped = fold.add('fold_cat', h[v], m_w, m_e_vw)
                 res = fold.add('U_{}'.format(k), reshaped)
                 h[v] = fold.add('fold_non_lin', res)
-        return fold
         # return fold, [list(h.values())]
         # result = fold.apply(self, [list(h.values())])[0].split(1, dim=0)
         # for i, r in enumerate(result):
@@ -118,30 +117,50 @@ class MPNNdirected:
 
 
     def make_opt_step_batched(self, batch_x, batch_y, t):
+        print('*')
         self.opt.zero_grad()
         loss = Variable(torch.zeros(1, 1))
         fold = Fold()
         g_dict, h_dict, h2_dict, y_true_dict = OrderedDict(), OrderedDict(), OrderedDict(), OrderedDict()
+        # for i in range(len(batch_x)):
+        #     smile = batch_x[i]
+        #     y_true_dict[smile] = batch_y[i]
+        #
+        #     g_dict[smile], h_dict[smile] = self.get_features_from_smiles(smile)
+        #     _, h2_dict[smile] = self.get_features_from_smiles(smile)
+        #
+        #     for k in range(0, t):
+        #         self.single_message_pass_dyn_batched(g_dict[smile], h_dict[smile], k, fold)
+
         for i in range(len(batch_x)):
             smile = batch_x[i]
-            y_true_dict[smile] = batch_y[i]
+            y_true = batch_y[i]
 
-            g_dict[smile], h_dict[smile] = self.get_features_from_smiles(smile)
-            _, h2_dict[smile] = self.get_features_from_smiles(smile)
+            g, h = self.get_features_from_smiles(smile)
+            _, h2 = self.get_features_from_smiles(smile)
 
             for k in range(0, t):
-                fold = self.single_message_pass_dyn_batched(g_dict[smile], h_dict[smile], k, fold)
+                self.single_message_pass_dyn_batched(g, h, k, fold)
+                print(k)
+                #print('************')
+                #print(fold.cached_nodes['fold_cat'].keys())
+
+
 
         # folded_nodes = h
         # result = fold.apply()
         self.fold = fold
-        folded_nodes = []
-        for k, v in h_dict.items():
-            folded_nodes.append(list(v.values()))
+        self.h = h
+        #folded_nodes = []
+        #for k, v in h.items():
+        #    folded_nodes.append(list(v.values()))
 
-        print(folded_nodes)
-        result = fold.apply(self, folded_nodes)
+        #print(folded_nodes)
+        #result = fold.apply(self, folded_nodes)
+        print(len(fold.cached_nodes))
+        result = fold.apply(self, [list(h.values())])
         print('1111')
+
 
 
 
