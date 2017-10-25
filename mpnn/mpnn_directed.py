@@ -3,7 +3,6 @@ import deepchem as dc
 import torch.optim as optim
 import copy
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
@@ -19,9 +18,10 @@ class MPNNdirected:
     """
     Performs full message passing procedure.
     """
-    def __init__(self, R, U, V, E, t):
+    def __init__(self, R, U, V, E, t, cuda=False):
         assert t > 0, 'ERROR: incorrect T value.'
         self.params = []
+        self.cuda = cuda
         self._construct_message_passing_func(R, U, V, E, t)
         self._add_params(t)
         self.opt = optim.Adam(self.params, lr=1e-3)
@@ -53,9 +53,16 @@ class MPNNdirected:
     def _construct_message_passing_func(self, R, U, V, E, t):
         self.R = R
         self.E = E
+        if self.cuda:
+            self.R.cuda()
+            self.E.cuda()
         for i in range(t):
-            setattr(self, 'V_{}'.format(i), copy.deepcopy(V))
-            setattr(self, 'U_{}'.format(i), copy.deepcopy(U))
+            if self.cuda:
+                setattr(self, 'V_{}'.format(i), copy.deepcopy(V.cuda()))
+                setattr(self, 'U_{}'.format(i), copy.deepcopy(U.cuda()))
+            else:
+                setattr(self, 'V_{}'.format(i), copy.deepcopy(V))
+                setattr(self, 'U_{}'.format(i), copy.deepcopy(U))
 
     def _add_params(self, t):
         self.params += list(self.R.parameters())
@@ -93,8 +100,8 @@ class MPNNdirected:
                 reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
                 h[v] = F.tanh(getattr(self, 'U_{}'.format(k))(reshaped))
 
-    def fold_cat(self, x1, x2, x3):
-        return torch.cat((x1, x2, x3), 1)
+    # def fold_cat(self, x1, x2, x3):
+    #     return torch.cat((x1, x2, x3), 1)
 
     def fold_non_lin(self, x):
         return F.tanh(x)
@@ -107,8 +114,10 @@ class MPNNdirected:
                 w = neighbor[1]  # atom w number
                 m_w = fold.add('V_{}'.format(k), h[w])
                 m_e_vw = fold.add('E', e_vw)
-                reshaped = fold.add('fold_cat', h[v], m_w, m_e_vw)
-                res = fold.add('U_{}'.format(k), reshaped)
+                #reshaped = fold.add('fold_cat', h[v], m_w, m_e_vw)
+                #res = fold.add('U_{}'.format(k), reshaped)
+                #reshaped = fold.add('fold_cat', h[v], m_w, m_e_vw)
+                res = fold.add('U_{}'.format(k), h[v], m_w, m_e_vw)
                 h[v] = fold.add('fold_non_lin', res)
         # return fold, [list(h.values())]
         # result = fold.apply(self, [list(h.values())])[0].split(1, dim=0)
@@ -117,7 +126,7 @@ class MPNNdirected:
 
 
     def make_opt_step_batched(self, batch_x, batch_y, t):
-        print('*')
+        #print('*')
         self.opt.zero_grad()
         loss = Variable(torch.zeros(1, 1))
         fold = Fold()
@@ -141,7 +150,7 @@ class MPNNdirected:
 
             for k in range(0, t):
                 self.single_message_pass_dyn_batched(g, h, k, fold)
-                print(k)
+                #print(k)
                 #print('************')
                 #print(fold.cached_nodes['fold_cat'].keys())
 
@@ -157,9 +166,9 @@ class MPNNdirected:
 
         #print(folded_nodes)
         #result = fold.apply(self, folded_nodes)
-        print(len(fold.cached_nodes))
+        #print(len(fold.cached_nodes))
         result = fold.apply(self, [list(h.values())])
-        print('1111')
+        #print('1111')
 
 
 

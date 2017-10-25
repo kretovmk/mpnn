@@ -65,7 +65,8 @@ class Ud(nn.Module):
         self.linear = nn.Linear(self.inp_size, self.out_size)
         self._init_params(self.linear)
 
-    def forward(self, x):
+    def forward(self, x1, x2, x3):
+        x = torch.cat((x1, x2, x3), 1)
         return self.linear(x)
 
 

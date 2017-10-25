@@ -108,11 +108,11 @@ class Fold(object):
                 #print(op)
                 try:
 
-                    if op == 'fold_cat':
-                        print('***')
-                        print(op)
-                        print(*self.steps[step][op])
-                        print('step: {}'.format(step))
+                    #if op == 'fold_cat':
+                        #print('***')
+                        #print(op)
+                        #print(*self.steps[step][op])
+                        #print('step: {}'.format(step))
                     batched_args = self._batch_args(
                         zip(*self.steps[step][op]), values)
                 except Exception:
