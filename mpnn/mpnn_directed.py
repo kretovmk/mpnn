@@ -71,19 +71,25 @@ class MPNNdirected:
             self.params += list(getattr(self, 'V_{}'.format(i)).parameters())
             self.params += list(getattr(self, 'U_{}'.format(i)).parameters())
 
-    def get_features_from_smiles(self, smile):
+    def get_features_from_smiles(self, smile, cuda=False):
         g = OrderedDict({})  # edges
         h = OrderedDict({})  # atoms
         molecule = Chem.MolFromSmiles(smile)
         for i in range(0, molecule.GetNumAtoms()):
             atom_i = molecule.GetAtomWithIdx(i)
             features = dc.feat.graph_features.atom_features(atom_i).astype(np.float32)
-            h[i] = Variable(torch.FloatTensor(features)).view(1, 75)
+            atom_var = Variable(torch.FloatTensor(features)).view(1, 75)
+            if cuda:
+                atom_var.cuda()
+            h[i] = atom_var
             for j in range(0, molecule.GetNumAtoms()):
                 e_ij = molecule.GetBondBetweenAtoms(i, j)
                 if e_ij != None:
                     e_ij = list(map(lambda x: 1 if x == True else 0, dc.feat.graph_features.bond_features(e_ij)))
-                    e_ij = Variable(torch.FloatTensor(e_ij).view(1, 6))
+                    edge_var = Variable(torch.FloatTensor(e_ij).view(1, 6))
+                    if cuda:
+                        edge_var.cuda()
+                    e_ij = edge_var
                     if i not in g:
                         g[i] = []
                         g[i].append((e_ij, j))

@@ -1,13 +1,12 @@
 
 import collections
-
 import torch
+
 from torch.autograd import Variable
-import torch.nn as nn
-from torch import optim
-import torch.nn.functional as F
+
 
 # code for torchfold taken from: https://github.com/nearai/pytorch-tools
+# Apache license 2.0
 
 class Fold(object):
 
