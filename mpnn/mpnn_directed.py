@@ -13,6 +13,7 @@ from torch.autograd import Variable
 from collections import OrderedDict
 
 # Some parts of code taken from https://github.com/deepchem/deepchem/blob/master/contrib/mpnn/mpnn.py
+# It is heavily rewrited and added batching
 # MIT License
 
 class MPNNdirected:
