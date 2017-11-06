@@ -1,6 +1,7 @@
 
 import deepchem as dc
 import torch.optim as optim
+import random
 import copy
 import torch
 import torch.nn.functional as F
@@ -11,6 +12,7 @@ from rdkit import Chem
 from utils import CUDA_wrapper
 from torch.autograd import Variable
 from collections import OrderedDict
+from copy import deepcopy
 
 # Some parts of code taken from https://github.com/deepchem/deepchem/blob/master/contrib/mpnn/mpnn.py
 # It is heavily rewrited and added batching
@@ -87,19 +89,46 @@ class MPNNdirected:
                 m_e_vw = fold.add('E', e_vw)
                 h[v] = fold.add('U_{}'.format(k), h[v], m_w, m_e_vw)
 
-    def make_opt_step_batched(self, batch_x, batch_y, t):
-        self.opt.zero_grad()
+    def batch_all_operations(self, x, t, shuffle=False):
         fold = Fold()
         folded_nodes = []
-        for i in range(len(batch_x)):
-            g, h = batch_x[i]
+        ix = list(range(len(x)))
+        if shuffle:
+            ix = random.shuffle(ix)
+        for i in ix:
+            g, h = x[i]
             for k in range(t):
                 self.single_message_pass_dyn_batched(g, h, k, fold)
             folded_nodes.append(list(h.values()))
-        results = fold.apply(self, folded_nodes)
+        return fold, folded_nodes, ix
+
+    def make_opt_step_batched(self, results, y_true):
+        self.opt.zero_grad()
         y_pred = torch.cat([self.R(x) for x  in results], dim=0)
-        y_true = Variable(torch.FloatTensor(batch_y).view(-1, 1))
-        loss = torch.sum((y_pred - y_true) **2 / len(batch_x), dim=0, keepdim=True)
+        #print(y_pred)
+        y_true = Variable(torch.FloatTensor(y_true).view(-1, 1))
+        #print(y_true)
+        if self.cuda:
+            y_true = y_true.cuda()
+        loss = torch.sum((y_pred - y_true) **2 / len(y_true), dim=0, keepdim=True)
         loss.backward()
         self.opt.step()
         return loss.data[0][0]
+
+    # def make_opt_step_batched(self, batch_x, batch_y, t):
+    #     self.opt.zero_grad()
+    #     fold = Fold()
+    #     folded_nodes = []
+    #     for i in range(len(batch_x)):
+    #         g, h = batch_x[i]
+    #         for k in range(t):
+    #             self.single_message_pass_dyn_batched(g, h, k, fold)
+    #         folded_nodes.append(list(h.values()))
+    #     return fold, folded_nodes
+        # results = fold.apply(self, folded_nodes)
+        # y_pred = torch.cat([self.R(x) for x  in results], dim=0)
+        # y_true = Variable(torch.FloatTensor(batch_y).view(-1, 1))
+        # loss = torch.sum((y_pred - y_true) **2 / len(batch_x), dim=0, keepdim=True)
+        # loss.backward()
+        # self.opt.step()
+        # return loss.data[0][0]
