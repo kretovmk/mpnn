@@ -77,20 +77,6 @@ class MPNNdirected:
                         g[i].append((e_ij, j))
         return g, h
 
-    def single_message_pass(self, g, h, k):
-        for v in g.keys():  # iterate over atoms
-            neighbors = g[v]   # list of tuples of the form (e_vw, w)
-            for neighbor in neighbors:
-                e_vw = neighbor[0]  # bond feature (between v and w)
-                w = neighbor[1]  # atom w number
-                m_w = getattr(self, 'V_{}'.format(k))(h[w])   # h[w] is feature of atom w
-                m_e_vw = self.E(e_vw)
-                reshaped = torch.cat((h[v], m_w, m_e_vw), 1)
-                h[v] = F.tanh(getattr(self, 'U_{}'.format(k))(reshaped))
-
-    def fold_non_lin(self, x):
-        return F.tanh(x)
-
     def single_message_pass_dyn_batched(self, g, h, k, fold):
         for v in g.keys():  # iterate over atoms
             neighbors = g[v]   # list of tuples of the form (e_vw, w)
@@ -99,8 +85,7 @@ class MPNNdirected:
                 w = neighbor[1]  # atom w number
                 m_w = fold.add('V_{}'.format(k), h[w])
                 m_e_vw = fold.add('E', e_vw)
-                res = fold.add('U_{}'.format(k), h[v], m_w, m_e_vw)
-                h[v] = fold.add('fold_non_lin', res)
+                h[v] = fold.add('U_{}'.format(k), h[v], m_w, m_e_vw)
 
     def make_opt_step_batched(self, batch_x, batch_y, t):
         self.opt.zero_grad()

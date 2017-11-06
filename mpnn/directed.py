@@ -20,14 +20,6 @@ class Rd(nn.Module):
         self.out = nn.Linear(self.hid_size, 1)
         self._init_params(self.out)
 
-    # def forward(self, h, h2):
-    #     catted_reads = map(lambda x: torch.cat([h[x[0]], h2[x[1]]], 1), zip(h2.keys(), h.keys()))
-    #     activated_reads = map(lambda x: F.relu(self.linear(x)), catted_reads)
-    #     readout = Variable(torch.zeros(1, self.hid_size))
-    #     for read in activated_reads:
-    #         readout = readout + read
-    #     return F.sigmoid(self.out(readout))
-
     def forward(self, h):
         out = torch.sum(self.linear(h), dim=0, keepdim=True)
         return F.sigmoid(self.out(out))
@@ -71,7 +63,7 @@ class Ud(nn.Module):
 
     def forward(self, x1, x2, x3):
         x = torch.cat((x1, x2, x3), 1)
-        return self.linear(x)
+        return F.tanh(self.linear(x))
 
 
     def _init_params(self, layer):
