@@ -31,11 +31,9 @@ class MPNNdirected:
         self.opt = optim.Adam(self.params, lr=1e-3)
 
     def forward_pass(self, x, t):
-        g, h = self.get_features_from_smiles(x)
-        for k in range(0, t):
-            self.single_message_pass(g, h, k)
-        h_concat = Variable(torch.cat([vv.data for kk, vv in h.items()], dim=0))
-        y_pred = self.R(h_concat.sum(dim=0, keepdim=True))
+        fold, folded_nodes, ix = self.batch_operations([x], t, shuffle=False)
+        result = fold.apply(self, folded_nodes)
+        y_pred = torch.cat([self.R(x) for x in result], dim=0)
         return y_pred
 
     def _construct_message_passing_func(self, R, U, V, E, t):
@@ -89,46 +87,23 @@ class MPNNdirected:
                 m_e_vw = fold.add('E', e_vw)
                 h[v] = fold.add('U_{}'.format(k), h[v], m_w, m_e_vw)
 
-    def batch_all_operations(self, x, t, shuffle=False):
+    def batch_operations(self, x, t):
         fold = Fold()
         folded_nodes = []
-        ix = list(range(len(x)))
-        if shuffle:
-            ix = random.shuffle(ix)
-        for i in ix:
+        for i in range(len(x)):
             g, h = x[i]
             for k in range(t):
                 self.single_message_pass_dyn_batched(g, h, k, fold)
             folded_nodes.append(list(h.values()))
-        return fold, folded_nodes, ix
+        return fold, folded_nodes
 
     def make_opt_step_batched(self, results, y_true):
         self.opt.zero_grad()
         y_pred = torch.cat([self.R(x) for x  in results], dim=0)
-        #print(y_pred)
         y_true = Variable(torch.FloatTensor(y_true).view(-1, 1))
-        #print(y_true)
         if self.cuda:
             y_true = y_true.cuda()
         loss = torch.sum((y_pred - y_true) **2 / len(y_true), dim=0, keepdim=True)
         loss.backward()
         self.opt.step()
         return loss.data[0][0]
-
-    # def make_opt_step_batched(self, batch_x, batch_y, t):
-    #     self.opt.zero_grad()
-    #     fold = Fold()
-    #     folded_nodes = []
-    #     for i in range(len(batch_x)):
-    #         g, h = batch_x[i]
-    #         for k in range(t):
-    #             self.single_message_pass_dyn_batched(g, h, k, fold)
-    #         folded_nodes.append(list(h.values()))
-    #     return fold, folded_nodes
-        # results = fold.apply(self, folded_nodes)
-        # y_pred = torch.cat([self.R(x) for x  in results], dim=0)
-        # y_true = Variable(torch.FloatTensor(batch_y).view(-1, 1))
-        # loss = torch.sum((y_pred - y_true) **2 / len(batch_x), dim=0, keepdim=True)
-        # loss.backward()
-        # self.opt.step()
-        # return loss.data[0][0]
