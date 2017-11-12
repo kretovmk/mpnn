@@ -1,18 +1,17 @@
 
-import deepchem as dc
-import torch.optim as optim
-import random
 import copy
-import torch
-import torch.nn.functional as F
+import random
+import deepchem as dc
 import numpy as np
+import torch
+import torch.optim as optim
 
-from torchfold import Fold
-from rdkit import Chem
-from utils import CUDA_wrapper
-from torch.autograd import Variable
+from utils.utils import CUDA_wrapper
 from collections import OrderedDict
-from copy import deepcopy
+from rdkit import Chem
+from torch.autograd import Variable
+from utils.torchfold import Fold
+
 
 # Some parts of code taken from https://github.com/deepchem/deepchem/blob/master/contrib/mpnn/mpnn.py
 # It is heavily rewrited and added batching

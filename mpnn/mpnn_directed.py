@@ -1,18 +1,11 @@
 
-import deepchem as dc
-import torch.optim as optim
-import random
 import copy
 import torch
-import torch.nn.functional as F
-import numpy as np
+import torch.optim as optim
 
-from torchfold import Fold
-from rdkit import Chem
-from utils import CUDA_wrapper
 from torch.autograd import Variable
-from collections import OrderedDict
-from copy import deepcopy
+from utils.torchfold import Fold
+
 
 # Some parts of code taken from https://github.com/deepchem/deepchem/blob/master/contrib/mpnn/mpnn.py
 # It is heavily rewrited and added batching
@@ -31,7 +24,7 @@ class MPNNdirected:
         self.opt = optim.Adam(self.params, lr=1e-3)
 
     def forward_pass(self, x, t):
-        fold, folded_nodes, ix = self.batch_operations([x], t, shuffle=False)
+        fold, folded_nodes = self.batch_operations([x], t)
         result = fold.apply(self, folded_nodes)
         y_pred = torch.cat([self.R(x) for x in result], dim=0)
         return y_pred
@@ -57,26 +50,6 @@ class MPNNdirected:
             self.params += list(getattr(self, 'V_{}'.format(i)).parameters())
             self.params += list(getattr(self, 'U_{}'.format(i)).parameters())
 
-    def get_features_from_smiles(self, smile, cuda=False):
-        g = OrderedDict({})  # edges
-        h = OrderedDict({})  # atoms
-        molecule = Chem.MolFromSmiles(smile)
-        for i in range(0, molecule.GetNumAtoms()):
-            atom_i = molecule.GetAtomWithIdx(i)
-            features = dc.feat.graph_features.atom_features(atom_i).astype(np.float32)
-            atom_var = Variable(CUDA_wrapper(torch.FloatTensor(features), cuda).view(1, 75))
-            h[i] = atom_var
-            for j in range(0, molecule.GetNumAtoms()):
-                e_ij = molecule.GetBondBetweenAtoms(i, j)
-                if e_ij != None:
-                    e_ij = list(map(lambda x: 1 if x == True else 0, dc.feat.graph_features.bond_features(e_ij)))
-                    edge_var = Variable(CUDA_wrapper(torch.FloatTensor(e_ij), cuda).view(1, 6))
-                    e_ij = edge_var
-                    if i not in g:
-                        g[i] = []
-                        g[i].append((e_ij, j))
-        return g, h
-
     def single_message_pass_dyn_batched(self, g, h, k, fold):
         for v in g.keys():  # iterate over atoms
             neighbors = g[v]   # list of tuples of the form (e_vw, w)
@@ -100,7 +73,7 @@ class MPNNdirected:
     def make_opt_step_batched(self, results, y_true):
         self.opt.zero_grad()
         y_pred = torch.cat([self.R(x) for x  in results], dim=0)
-        y_true = Variable(torch.FloatTensor(y_true).view(-1, 1))
+        y_true = Variable(torch.cat(y_true).view(-1, 1))
         if self.cuda:
             y_true = y_true.cuda()
         loss = torch.sum((y_pred - y_true) **2 / len(y_true), dim=0, keepdim=True)
